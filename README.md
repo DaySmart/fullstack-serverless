@@ -365,6 +365,22 @@ Real world [access log](https://docs.aws.amazon.com/AmazonCloudFront/latest/Deve
          
 ---
 
+**originPath**
+
+_optional_, default: `not set`
+
+```yaml
+custom:
+  fullstack:
+    ...
+    originPath: customPath
+    ...
+```
+
+Supports a custom origin path for the web application in the cloudfront distribution
+         
+---
+
 ### Command-line Parameters
 
 

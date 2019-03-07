@@ -314,9 +314,12 @@ class ServerlessFullstackPlugin {
 
     prepareOrigins(distributionConfig) {
         this.serverless.cli.log(`Setting ApiGateway stage to '${this.getStage()}'...`);
+        const originPath = this.getConfig('originPath', null);
         for (var origin of distributionConfig.Origins) {
             if (origin.Id === 'ApiGateway') {
                 origin.OriginPath = `/${this.getStage()}`;
+            } else if (origin.Id === 'WebApp' && originPath !== null) {
+                origin.OriginPath = originPath;
             }
         }
     }
