@@ -217,27 +217,40 @@ class ServerlessFullstackPlugin {
         if (this.cliOptions['invalidate-distribution'] === false) {
             this.serverless.cli.log(`Skipping cloudfront invalidation...`)
         } else {
-            const awsInfo = _.find(this.serverless.pluginManager.getPlugins(), (plugin) => {
-                return plugin.constructor.name === 'AwsInfo';
-            });
+            // const awsInfo = _.find(this.serverless.pluginManager.getPlugins(), (plugin) => {
+            //     return plugin.constructor.name === 'AwsInfo';
+            // });
 
-            if (!awsInfo || !awsInfo.gatheredData) {
-                this.serverless.cli.log(`Skipping cloudfront invalidation because aws info was missing.`);
+            // if (!awsInfo || !awsInfo.gatheredData) {
+            //     this.serverless.cli.log(`Skipping cloudfront invalidation because aws info was missing.`);
+            //     return;
+            // }
+
+            // const outputs = awsInfo.gatheredData.outputs;
+            // const apiDistributionId = _.find(outputs, (output) => {
+            //     return output.OutputKey === 'ApiDistributionId';
+            // });
+
+            // if (!apiDistributionId || !apiDistributionId.OutputValue) {
+            //     this.serverless.cli.log(`Skipping cloudfront invalidation because cloudformation output could not be found.`);
+            //     return;
+            // }
+            const stackResources = self.serverless.provider.getStackResources();
+            if (!stackResources) {
+                this.serverless.cli.log(`Skipping cloudfront invalidation because could not get stack info...`);
                 return;
             }
 
-            const outputs = awsInfo.gatheredData.outputs;
-            const apiDistributionId = _.find(outputs, (output) => {
-                return output.OutputKey === 'ApiDistributionId';
-            });
-
-            if (!apiDistributionId || !apiDistributionId.OutputValue) {
-                this.serverless.cli.log(`Skipping cloudfront invalidation because cloudformation output could not be found.`);
+            const apiDistribution = _.find(stackResources, (stackResource) => {
+                return stackResource.LogicalResourceId === 'ApiDistribution'
+            })
+            if(!apiDistribution) {
+                this.serverless.cli.log(`Skipping cloudfront invalidation because cloudformation resource was not found`);
                 return;
             }
-
+            const apiDistributionId = apiDistribution.PhysicalResourceId
             var params = {
-                DistributionId: apiDistributionId.OutputValue,
+                DistributionId: apiDistributionId,
                 InvalidationBatch: {
                     CallerReference: Date.now().toString(),
                     Paths: {
@@ -253,7 +266,7 @@ class ServerlessFullstackPlugin {
                     const invalidationId = data.Invalidation.Id;
                     var invalidationComplete = false;
                     var params = {
-                        DistributionId: apiDistributionId.OutputValue,
+                        DistributionId: apiDistributionId,
                         Id: invalidationId
                     };
                     setInterval(function() {
