@@ -147,3 +147,5 @@ Outputs:
   ApiDistribution:
     Value:
       Fn::GetAtt: [ ApiDistribution, DomainName ]
+  ApiDistributionId:
+    Value: !Ref ApiDistribution
