@@ -202,6 +202,9 @@ class ServerlessFullstackPlugin {
                             this.serverless.cli.log(
                                 `Success! Client deployed.`
                             );
+                        })
+                        .then(() => {
+                            return this.invalidateClientStack();
                         });
                 }
                 this.serverless.cli.log('Client deployment cancelled');
@@ -210,6 +213,76 @@ class ServerlessFullstackPlugin {
             .catch(error => {
                 return BbPromise.reject(new this.error(error));
             });
+    }
+
+    invalidateClientStack() {
+        let apiDistributionId,
+            invalidationId;
+            
+        if (this.cliOptions['invalidate-distribution'] === false) {
+            this.serverless.cli.log(`Skipping cloudfront invalidation...`);
+        } else {
+            return this.aws.request('CloudFormation', 'listStackResources', {StackName: this.aws.naming.getStackName()}).then(stacks => {
+                const apiDistribution = _.find(stacks.StackResourceSummaries, (stack) => {
+                    return stack.LogicalResourceId === 'ApiDistribution'
+                });
+                if(!apiDistribution) {
+                    this.serverless.cli.log(`Skipping cloudfront invalidation because cloudformation resource was not found`);
+                    return;
+                }
+                apiDistributionId = apiDistribution.PhysicalResourceId;
+            })
+            .then(() => {
+                var params = {
+                    DistributionId: apiDistributionId,
+                    InvalidationBatch: {
+                        CallerReference: Date.now().toString(),
+                        Paths: {
+                            Quantity: 1,
+                            Items: ['/*']
+                        }
+                    }
+                };
+                return this.aws.request('CloudFront', 'createInvalidation', params)
+                    .then(resp => {
+                        this.serverless.cli.log(`CloudFront Invalidation started...`);
+                        invalidationId = resp.Invalidation.Id;
+                    })
+            })
+            .then(() => {
+                const isDistributionInvalidated = () => {
+                    var params = {
+                        DistributionId: apiDistributionId,
+                        Id: invalidationId
+                    };
+                    return new Promise((resolve, reject) => this.aws.request('CloudFront', 'getInvalidation', params).then(status => {
+                        if(status.Invalidation.Status === 'Completed') {
+                            return resolve(true)
+                        } else {
+                            return resolve(false)
+                        }
+                    }));
+                }
+                
+                const waitForInvalidationToComplete = () => {
+                    return new Promise((resolve, reject) => {
+                        setInterval(() => {
+                            isDistributionInvalidated().then(result => {
+                                if(result) {
+                                    return resolve();
+                                }
+                            })
+                        }, 1000)
+                    })
+                }
+                
+                return waitForInvalidationToComplete()
+            })
+            .then(() => {
+                this.serverless.cli.log('Success! CloudFront invalidation completed.');
+                return BbPromise.resolve();
+            });
+        }
     }
 
     createDeploymentArtifacts() {
