@@ -266,9 +266,10 @@ class ServerlessFullstackPlugin {
                 
                 const waitForInvalidationToComplete = () => {
                     return new Promise((resolve, reject) => {
-                        setInterval(() => {
+                        const distributionPoll = setInterval(() => {
                             isDistributionInvalidated().then(result => {
                                 if(result) {
+                                    clearInterval(distributionPoll);
                                     return resolve();
                                 }
                             })
